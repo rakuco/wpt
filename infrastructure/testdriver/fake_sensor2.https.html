@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<title>Sensor</title>
+<script src="/resources/testharness.js"></script>
+<script src="/resources/testharnessreport.js"></script>
+<script src="/resources/testdriver.js"></script>
+<script src="/resources/testdriver-vendor.js"></script>
+<script>
+"use strict";
+
+promise_test(async t => {
+  const sensorType = 'gyroscope';
+  await test_driver.create_fake_sensor({type: sensorType});
+
+  const sensor = new Gyroscope();
+  // See https://web-platform-tests.org/writing-tests/testharness-api.html#cleanup
+  // We need this to make sure one test does not interfere with
+  // another by stopping sensors and removing any overrides before the
+  // next test is run.
+  t.add_cleanup(async () => {
+    sensor.stop();
+    await test_driver.remove_fake_sensor({type: sensorType});
+  });
+  const watcher = new EventWatcher(t, sensor, ['activate']);
+
+  sensor.start();
+  await watcher.wait_for('activate');
+}, "Test that create_fake_sensor() works");
+
+promise_test(async t => {
+  const sensorType = 'gyroscope';
+  await test_driver.create_fake_sensor({type: sensorType, connected: false});
+
+  const sensor = new Gyroscope();
+  t.add_cleanup(async () => {
+    sensor.stop();
+    await test_driver.remove_fake_sensor({type: sensorType});
+  });
+
+  const watcher = new EventWatcher(t, sensor, ['error']);
+  sensor.start();
+  const error = await watcher.wait_for('error');
+  assert_equals(error.error.name, 'NotReadableError');
+}, "Test that create_fake_sensor() can create an unavailable sensor");
+
+promise_test(async t => {
+  let tested_sensor = 'gyroscope'
+  let create_parameters = {
+    'type': tested_sensor
+  };
+  console.trace("JV666 CreateFakeSensor")
+  await test_driver.create_fake_sensor(create_parameters);
+
+  console.trace("JV666 sensor_start")
+  let sensor = new Gyroscope();
+  const watcher = new EventWatcher(t, sensor, ['activate', 'reading', 'error']);
+  sensor.start();
+  await watcher.wait_for('activate');
+
+  // Waiting for debugging
+  let update_parameters = {
+    'type': tested_sensor,
+    'x': 1.0,
+    'y': 2.0,
+    'z': 3.0
+  };
+  await test_driver.update_fake_sensor(update_parameters);
+
+  await watcher.wait_for('reading');
+  assert_approx_equals(sensor.x, 1.0, 0.01);
+  assert_approx_equals(sensor.y, 2.0, 0.01);
+  assert_approx_equals(sensor.z, 3.0, 0.01);
+
+  update_parameters = {
+    'type': tested_sensor,
+    'x': 100.0,
+    'y': 200.0,
+    'z': 300.0
+  };
+  await test_driver.update_fake_sensor(update_parameters);
+
+  await watcher.wait_for('reading');
+  assert_approx_equals(sensor.x, 100.0, 0.01);
+  assert_approx_equals(sensor.y, 200.0, 0.01);
+  assert_approx_equals(sensor.z, 300.0, 0.01);
+
+  let remove_parameters = {
+    'type': tested_sensor
+  };
+  test_driver.remove_fake_sensor(remove_parameters);
+
+  await watcher.wait_for('error');
+
+  console.trace("JV666 TEST_END")
+}, "Sensor test");
+
+</script>
