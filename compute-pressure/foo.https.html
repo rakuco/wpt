@@ -1,6 +1,41 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<script src="/resources/testdriver.js"></script>
+<script src="/resources/testdriver-vendor.js"></script>
 <script>
- let cp = new PressureObserver(change => {
-     console.log(change);
- });
- cp.observe('cpu');
+ async function messageHandler(e) {
+     switch (e.data.command) {
+         case 'start':
+             return new Promise(resolve => {
+                 const cp = new PressureObserver(change => {
+                     console.log(change);
+                     cp.disconnect();
+                     resolve();
+                 });
+                 cp.observe('cpu');
+             });
+
+         default:
+             return Promise.reject(`unknown command "${e.data.command}"`);
+     }
+ }
+
+ test_driver.set_test_context(window.parent);
+ window.onmessage = async (e) => {
+     if (!e.data.command) {
+         return;
+     }
+
+     try {
+         test_driver.message_test({
+             command: e.data.command,
+             result: await messageHandler(e),
+         });
+     } catch (error) {
+         test_driver.message_test({
+             command: e.data.command,
+             error,
+         });
+     }
+ }
 </script>
